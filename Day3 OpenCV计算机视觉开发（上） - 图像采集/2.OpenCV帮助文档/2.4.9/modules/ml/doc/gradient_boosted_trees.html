@@ -1,0 +1,461 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-33108845-1']);
+  _gaq.push(['_setDomainName', 'opencv.org']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Gradient Boosted Trees &mdash; OpenCV 2.4.9.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '2.4.9.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../../../_static/insertIframe.js"></script>
+    <link rel="top" title="OpenCV 2.4.9.0 documentation" href="../../../index.html" />
+    <link rel="up" title="ml. Machine Learning" href="ml.html" />
+    <link rel="next" title="Random Trees" href="random_trees.html" />
+    <link rel="prev" title="Boosting" href="boosting.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="random_trees.html" title="Random Trees"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="boosting.html" title="Boosting"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../../index.html">OpenCV 2.4.9.0 documentation</a> &raquo;</li>
+          <li><a href="../../refman.html" >OpenCV API Reference</a> &raquo;</li>
+          <li><a href="ml.html" accesskey="U">ml. Machine Learning</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+  
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="gradient-boosted-trees">
+<span id="id1"></span><h1>Gradient Boosted Trees<a class="headerlink" href="#gradient-boosted-trees" title="Permalink to this headline">¶</a></h1>
+<p>Gradient Boosted Trees (GBT) is a generalized boosting algorithm introduced by
+Jerome Friedman: <a class="reference external" href="http://www.salfordsystems.com/doc/GreedyFuncApproxSS.pdf">http://www.salfordsystems.com/doc/GreedyFuncApproxSS.pdf</a> .
+In contrast to the AdaBoost.M1 algorithm, GBT can deal with both multiclass
+classification and regression problems. Moreover, it can use any
+differential loss function, some popular ones are implemented.
+Decision trees (<a class="reference internal" href="decision_trees.html#CvDTree : public CvStatModel" title="class CvDTree : public CvStatModel"><tt class="xref ocv ocv-class docutils literal"><span class="pre">CvDTree</span></tt></a>) usage as base learners allows to process ordered
+and categorical variables.</p>
+<div class="section" id="training-the-gbt-model">
+<span id="training-gbt"></span><h2>Training the GBT model<a class="headerlink" href="#training-the-gbt-model" title="Permalink to this headline">¶</a></h2>
+<p>Gradient Boosted Trees model represents an ensemble of single regression trees
+built in a greedy fashion. Training procedure is an iterative process
+similar to the numerical optimization via the gradient descent method. Summary loss
+on the training set depends only on the current model predictions for the
+training samples,  in other words
+<img class="math" src="../../../_images/math/041b96d10e595b6d695fe5f4a90e99f13b93b48e.png" alt="\sum^N_{i=1}L(y_i, F(x_i)) \equiv \mathcal{L}(F(x_1), F(x_2), ... , F(x_N))
+\equiv \mathcal{L}(F)"/>. And the <img class="math" src="../../../_images/math/815f52293ae7494b6f54996cdff5d936590f7fb8.png" alt="\mathcal{L}(F)"/>
+gradient can be computed as follows:</p>
+<div class="math">
+<p><img src="../../../_images/math/f1049b5ad90dfb96d09b699560f4d483998ca7a9.png" alt="grad(\mathcal{L}(F)) = \left( \dfrac{\partial{L(y_1, F(x_1))}}{\partial{F(x_1)}},
+\dfrac{\partial{L(y_2, F(x_2))}}{\partial{F(x_2)}}, ... ,
+\dfrac{\partial{L(y_N, F(x_N))}}{\partial{F(x_N)}} \right) ."/></p>
+</div><p>At every training step, a single regression tree is built to predict an
+antigradient vector components. Step length is computed corresponding to the
+loss function and separately for every region determined by the tree leaf. It
+can be eliminated by changing values of the leaves  directly.</p>
+<p>See below the main scheme of the training process:</p>
+<ol class="arabic simple">
+<li>Find the best constant model.</li>
+<li>For <img class="math" src="../../../_images/math/34857b3ba74ce5cd8607f3ebd23e9015908ada71.png" alt="i"/> in <img class="math" src="../../../_images/math/ba2114a65b72af32f9da4dfb8fc84de0e90a8903.png" alt="[1,M]"/>:<ol class="arabic">
+<li>Compute the antigradient.</li>
+<li>Grow a regression tree to predict antigradient components.</li>
+<li>Change values in the tree leaves.</li>
+<li>Add the tree to the model.</li>
+</ol>
+</li>
+</ol>
+<p>The following loss functions are implemented for regression problems:</p>
+<ul>
+<li><p class="first">Squared loss (<tt class="docutils literal"><span class="pre">CvGBTrees::SQUARED_LOSS</span></tt>):
+<img class="math" src="../../../_images/math/f2ef4ef6cf21f5f1e857b5716b5ddfa7fa47e6a4.png" alt="L(y,f(x))=\dfrac{1}{2}(y-f(x))^2"/></p>
+</li>
+<li><p class="first">Absolute loss (<tt class="docutils literal"><span class="pre">CvGBTrees::ABSOLUTE_LOSS</span></tt>):
+<img class="math" src="../../../_images/math/ba42a5805cf45f68a295b23587e675c7ad1df76e.png" alt="L(y,f(x))=|y-f(x)|"/></p>
+</li>
+<li><p class="first">Huber loss (<tt class="docutils literal"><span class="pre">CvGBTrees::HUBER_LOSS</span></tt>):
+<img class="math" src="../../../_images/math/d96115b5c2622d7e5ff02e2c9980d52d7a5a4c1c.png" alt="L(y,f(x)) = \left\{ \begin{array}{lr}
+\delta\cdot\left(|y-f(x)|-\dfrac{\delta}{2}\right) &amp; : |y-f(x)|&gt;\delta\\
+\dfrac{1}{2}\cdot(y-f(x))^2 &amp; : |y-f(x)|\leq\delta \end{array} \right."/>,</p>
+<p>where <img class="math" src="../../../_images/math/0a42a8b725c200085e5253db2d2fbf8dab898a8f.png" alt="\delta"/> is the <img class="math" src="../../../_images/math/10f32377ac67d94f764f12a15ea987e88c85d3e1.png" alt="\alpha"/>-quantile estimation of the
+<img class="math" src="../../../_images/math/ef4d748111493fbfcc47e20c4caa06a4f177f04a.png" alt="|y-f(x)|"/>. In the current implementation <img class="math" src="../../../_images/math/f7b6b753dac3605f7d03965b3fa84ca8314a7bd5.png" alt="\alpha=0.2"/>.</p>
+</li>
+</ul>
+<p>The following loss functions are implemented for classification problems:</p>
+<ul class="simple">
+<li>Deviance or cross-entropy loss (<tt class="docutils literal"><span class="pre">CvGBTrees::DEVIANCE_LOSS</span></tt>):
+<img class="math" src="../../../_images/math/dfb064112b6c94470339f6571f69d07afc1c024c.png" alt="K"/> functions are built, one function for each output class, and
+<img class="math" src="../../../_images/math/81c160f0773f2591c58b27c00fc8b131a678bf1d.png" alt="L(y,f_1(x),...,f_K(x)) = -\sum^K_{k=0}1(y=k)\ln{p_k(x)}"/>,
+where <img class="math" src="../../../_images/math/a4e10736d0ed9b6c97a1a0bc8ed5eaf4dbe97538.png" alt="p_k(x)=\dfrac{\exp{f_k(x)}}{\sum^K_{i=1}\exp{f_i(x)}}"/>
+is the estimation of the probability of <img class="math" src="../../../_images/math/e27c522cab00176729dcb425293b1be0276f6b21.png" alt="y=k"/>.</li>
+</ul>
+<p>As a result, you get the following model:</p>
+<div class="math">
+<p><img src="../../../_images/math/ae6cd712d6343ba1117ea73181f2609a8e237d7a.png" alt="f(x) = f_0 + \nu\cdot\sum^M_{i=1}T_i(x) ,"/></p>
+</div><p>where <img class="math" src="../../../_images/math/dc996570a1dbe87c088b9d65db29e6f0f54bfc62.png" alt="f_0"/> is the initial guess (the best constant model) and <img class="math" src="../../../_images/math/d6a7ccf879c4a4fe694033606332cb83806db296.png" alt="\nu"/>
+is a regularization parameter from the interval <img class="math" src="../../../_images/math/101678300d1aa11009468da8419aaf2c57b795bd.png" alt="(0,1]"/>, further called
+<em>shrinkage</em>.</p>
+</div>
+<div class="section" id="predicting-with-the-gbt-model">
+<span id="predicting-with-gbt"></span><h2>Predicting with the GBT Model<a class="headerlink" href="#predicting-with-the-gbt-model" title="Permalink to this headline">¶</a></h2>
+<p>To get the GBT model prediction, you need to compute the sum of responses of
+all the trees in the ensemble. For regression problems, it is the answer.
+For classification problems, the result is <img class="math" src="../../../_images/math/34593b70e957dfe86c1bf177232e6326cb1eb257.png" alt="\arg\max_{i=1..K}(f_i(x))"/>.</p>
+</div>
+<div class="section" id="cvgbtreesparams">
+<h2>CvGBTreesParams<a class="headerlink" href="#cvgbtreesparams" title="Permalink to this headline">¶</a></h2>
+<dl class="struct">
+<dt id="CvGBTreesParams : public CvDTreeParams">
+<em class="property">struct </em><tt class="descname">CvGBTreesParams</tt> : <em class="property">public</em> <tt class="descname">CvDTreeParams</tt><a class="headerlink" href="#CvGBTreesParams : public CvDTreeParams" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p>GBT training parameters.</p>
+<p>The structure contains parameters for each single decision tree in the ensemble,
+as well as the whole model characteristics. The structure is derived from
+<tt class="xref ocv ocv-class docutils literal"><span class="pre">CvDTreeParams</span></tt> but not all of the decision tree parameters are supported:
+cross-validation, pruning, and class priorities are not used.</p>
+</div>
+<div class="section" id="cvgbtreesparams-cvgbtreesparams">
+<h2>CvGBTreesParams::CvGBTreesParams<a class="headerlink" href="#cvgbtreesparams-cvgbtreesparams" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="CvGBTreesParams::CvGBTreesParams()">
+<strong>C++:</strong><tt class="descname"> </tt> <tt class="descclassname">CvGBTreesParams::</tt><tt class="descname">CvGBTreesParams</tt><big>(</big><big>)</big><a class="headerlink" href="#CvGBTreesParams::CvGBTreesParams()" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="CvGBTreesParams::CvGBTreesParams(int loss_function_type, int weak_count, float shrinkage, float subsample_portion, int max_depth, bool use_surrogates)">
+<strong>C++:</strong><tt class="descname"> </tt> <tt class="descclassname">CvGBTreesParams::</tt><tt class="descname">CvGBTreesParams</tt><big>(</big>int <strong>loss_function_type</strong>, int <strong>weak_count</strong>, float <strong>shrinkage</strong>, float <strong>subsample_portion</strong>, int <strong>max_depth</strong>, bool <strong>use_surrogates</strong><big>)</big><a class="headerlink" href="#CvGBTreesParams::CvGBTreesParams(int loss_function_type, int weak_count, float shrinkage, float subsample_portion, int max_depth, bool use_surrogates)" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>loss_function_type</strong> &#8211; Type of the loss function used for training
+(see <a class="reference internal" href="#training-gbt"><em>Training the GBT model</em></a>). It must be one of the
+following types: <tt class="docutils literal"><span class="pre">CvGBTrees::SQUARED_LOSS</span></tt>, <tt class="docutils literal"><span class="pre">CvGBTrees::ABSOLUTE_LOSS</span></tt>,
+<tt class="docutils literal"><span class="pre">CvGBTrees::HUBER_LOSS</span></tt>, <tt class="docutils literal"><span class="pre">CvGBTrees::DEVIANCE_LOSS</span></tt>. The first three
+types are used for regression problems, and the last one for
+classification.</li>
+<li><strong>weak_count</strong> &#8211; Count of boosting algorithm iterations. <tt class="docutils literal"><span class="pre">weak_count*K</span></tt> is the total
+count of trees in the GBT model, where <tt class="docutils literal"><span class="pre">K</span></tt> is the output classes count
+(equal to one in case of a regression).</li>
+<li><strong>shrinkage</strong> &#8211; Regularization parameter (see <a class="reference internal" href="#training-gbt"><em>Training the GBT model</em></a>).</li>
+<li><strong>subsample_portion</strong> &#8211; Portion of the whole training set used for each algorithm iteration.
+Subset is generated randomly. For more information see
+<a class="reference external" href="http://www.salfordsystems.com/doc/StochasticBoostingSS.pdf">http://www.salfordsystems.com/doc/StochasticBoostingSS.pdf</a>.</li>
+<li><strong>max_depth</strong> &#8211; Maximal depth of each decision tree in the ensemble (see <a class="reference internal" href="decision_trees.html#CvDTree : public CvStatModel" title="class CvDTree : public CvStatModel"><tt class="xref ocv ocv-class docutils literal"><span class="pre">CvDTree</span></tt></a>).</li>
+<li><strong>use_surrogates</strong> &#8211; If <tt class="docutils literal"><span class="pre">true</span></tt>, surrogate splits are built (see <a class="reference internal" href="decision_trees.html#CvDTree : public CvStatModel" title="class CvDTree : public CvStatModel"><tt class="xref ocv ocv-class docutils literal"><span class="pre">CvDTree</span></tt></a>).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>By default the following constructor is used:</p>
+<div class="highlight-cpp"><div class="highlight"><pre><span class="n">CvGBTreesParams</span><span class="p">(</span><span class="n">CvGBTrees</span><span class="o">::</span><span class="n">SQUARED_LOSS</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mf">0.8f</span><span class="p">,</span> <span class="mf">0.01f</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="kc">false</span><span class="p">)</span>
+    <span class="o">:</span> <span class="n">CvDTreeParams</span><span class="p">(</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="mi">0</span> <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="cvgbtrees">
+<h2>CvGBTrees<a class="headerlink" href="#cvgbtrees" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="CvGBTrees : public CvStatModel">
+<em class="property">class </em><tt class="descname">CvGBTrees</tt> : <em class="property">public</em> <tt class="descname">CvStatModel</tt><a class="headerlink" href="#CvGBTrees : public CvStatModel" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p>The class implements the Gradient boosted tree model as described in the beginning of this section.</p>
+</div>
+<div class="section" id="cvgbtrees-cvgbtrees">
+<h2>CvGBTrees::CvGBTrees<a class="headerlink" href="#cvgbtrees-cvgbtrees" title="Permalink to this headline">¶</a></h2>
+<p>Default and training constructors.</p>
+<dl class="function">
+<dt id="CvGBTrees::CvGBTrees()">
+<strong>C++:</strong><tt class="descname"> </tt> <tt class="descclassname">CvGBTrees::</tt><tt class="descname">CvGBTrees</tt><big>(</big><big>)</big><a class="headerlink" href="#CvGBTrees::CvGBTrees()" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="CvGBTrees::CvGBTrees(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params)">
+<strong>C++:</strong><tt class="descname"> </tt> <tt class="descclassname">CvGBTrees::</tt><tt class="descname">CvGBTrees</tt><big>(</big>const Mat&amp; <strong>trainData</strong>, int <strong>tflag</strong>, const Mat&amp; <strong>responses</strong>, const Mat&amp; <strong>varIdx</strong>=Mat(), const Mat&amp; <strong>sampleIdx</strong>=Mat(), const Mat&amp; <strong>varType</strong>=Mat(), const Mat&amp; <strong>missingDataMask</strong>=Mat(), CvGBTreesParams <strong>params</strong>=CvGBTreesParams() <big>)</big><a class="headerlink" href="#CvGBTrees::CvGBTrees(const Mat& trainData, int tflag, const Mat& responses, const Mat& varIdx, const Mat& sampleIdx, const Mat& varType, const Mat& missingDataMask, CvGBTreesParams params)" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="CvGBTrees::CvGBTrees(const CvMat* trainData, int tflag, const CvMat* responses, const CvMat* varIdx, const CvMat* sampleIdx, const CvMat* varType, const CvMat* missingDataMask, CvGBTreesParams params)">
+<strong>C++:</strong><tt class="descname"> </tt> <tt class="descclassname">CvGBTrees::</tt><tt class="descname">CvGBTrees</tt><big>(</big>const CvMat* <strong>trainData</strong>, int <strong>tflag</strong>, const CvMat* <strong>responses</strong>, const CvMat* <strong>varIdx</strong>=0, const CvMat* <strong>sampleIdx</strong>=0, const CvMat* <strong>varType</strong>=0, const CvMat* <strong>missingDataMask</strong>=0, CvGBTreesParams <strong>params</strong>=CvGBTreesParams() <big>)</big><a class="headerlink" href="#CvGBTrees::CvGBTrees(const CvMat* trainData, int tflag, const CvMat* responses, const CvMat* varIdx, const CvMat* sampleIdx, const CvMat* varType, const CvMat* missingDataMask, CvGBTreesParams params)" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="pyfunction">
+<dt id="cv2.GBTrees">
+<strong>Python:</strong><tt class="descname"> </tt><tt class="descclassname">cv2.</tt><tt class="descname">GBTrees</tt><big>(</big><span class="optional">[</span>trainData, tflag, responses<span class="optional">[</span>, varIdx<span class="optional">[</span>, sampleIdx<span class="optional">[</span>, varType<span class="optional">[</span>, missingDataMask<span class="optional">[</span>, params<span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big> &rarr; &lt;GBTrees object&gt;<a class="headerlink" href="#cv2.GBTrees" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p>The constructors follow conventions of <a class="reference internal" href="statistical_models.html#CvStatModel::CvStatModel()" title="CvStatModel::CvStatModel()"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvStatModel::CvStatModel()</span></tt></a>. See <a class="reference internal" href="statistical_models.html#bool CvStatModel::train(const Mat&amp; train_data, [int tflag,] ..., const Mat&amp; responses, ..., [const Mat&amp; var_idx,] ..., [const Mat&amp; sample_idx,] ... [const Mat&amp; var_type,] ..., [const Mat&amp; missing_mask,] &lt;misc_training_alg_params&gt; ...)" title="bool CvStatModel::train(const Mat&amp; train_data, [int tflag,] ..., const Mat&amp; responses, ..., [const Mat&amp; var_idx,] ..., [const Mat&amp; sample_idx,] ... [const Mat&amp; var_type,] ..., [const Mat&amp; missing_mask,] &lt;misc_training_alg_params&gt; ...)"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvStatModel::train()</span></tt></a> for parameters descriptions.</p>
+</div>
+<div class="section" id="cvgbtrees-train">
+<h2>CvGBTrees::train<a class="headerlink" href="#cvgbtrees-train" title="Permalink to this headline">¶</a></h2>
+<p>Trains a Gradient boosted tree model.</p>
+<dl class="function">
+<dt id="bool CvGBTrees::train(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params, bool update)">
+<strong>C++:</strong><tt class="descname"> </tt>bool <tt class="descclassname">CvGBTrees::</tt><tt class="descname">train</tt><big>(</big>const Mat&amp; <strong>trainData</strong>, int <strong>tflag</strong>, const Mat&amp; <strong>responses</strong>, const Mat&amp; <strong>varIdx</strong>=Mat(), const Mat&amp; <strong>sampleIdx</strong>=Mat(), const Mat&amp; <strong>varType</strong>=Mat(), const Mat&amp; <strong>missingDataMask</strong>=Mat(), CvGBTreesParams <strong>params</strong>=CvGBTreesParams(), bool <strong>update</strong>=false<big>)</big><a class="headerlink" href="#bool CvGBTrees::train(const Mat& trainData, int tflag, const Mat& responses, const Mat& varIdx, const Mat& sampleIdx, const Mat& varType, const Mat& missingDataMask, CvGBTreesParams params, bool update)" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bool CvGBTrees::train(const CvMat* trainData, int tflag, const CvMat* responses, const CvMat* varIdx, const CvMat* sampleIdx, const CvMat* varType, const CvMat* missingDataMask, CvGBTreesParams params, bool update)">
+<strong>C++:</strong><tt class="descname"> </tt>bool <tt class="descclassname">CvGBTrees::</tt><tt class="descname">train</tt><big>(</big>const CvMat* <strong>trainData</strong>, int <strong>tflag</strong>, const CvMat* <strong>responses</strong>, const CvMat* <strong>varIdx</strong>=0, const CvMat* <strong>sampleIdx</strong>=0, const CvMat* <strong>varType</strong>=0, const CvMat* <strong>missingDataMask</strong>=0, CvGBTreesParams <strong>params</strong>=CvGBTreesParams(), bool <strong>update</strong>=false <big>)</big><a class="headerlink" href="#bool CvGBTrees::train(const CvMat* trainData, int tflag, const CvMat* responses, const CvMat* varIdx, const CvMat* sampleIdx, const CvMat* varType, const CvMat* missingDataMask, CvGBTreesParams params, bool update)" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="bool CvGBTrees::train(CvMLData* data, CvGBTreesParams params, bool update)">
+<strong>C++:</strong><tt class="descname"> </tt>bool <tt class="descclassname">CvGBTrees::</tt><tt class="descname">train</tt><big>(</big>CvMLData* <strong>data</strong>, CvGBTreesParams <strong>params</strong>=CvGBTreesParams(), bool <strong>update</strong>=false<big>)</big><a class="headerlink" href="#bool CvGBTrees::train(CvMLData* data, CvGBTreesParams params, bool update)" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="pyfunction">
+<dt id="cv2.GBTrees.train">
+<strong>Python:</strong><tt class="descname"> </tt><tt class="descclassname">cv2.GBTrees.</tt><tt class="descname">train</tt><big>(</big>trainData, tflag, responses<span class="optional">[</span>, varIdx<span class="optional">[</span>, sampleIdx<span class="optional">[</span>, varType<span class="optional">[</span>, missingDataMask<span class="optional">[</span>, params<span class="optional">[</span>, update<span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big> &rarr; retval<a class="headerlink" href="#cv2.GBTrees.train" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p>The first train method follows the common template (see <a class="reference internal" href="statistical_models.html#bool CvStatModel::train(const Mat&amp; train_data, [int tflag,] ..., const Mat&amp; responses, ..., [const Mat&amp; var_idx,] ..., [const Mat&amp; sample_idx,] ... [const Mat&amp; var_type,] ..., [const Mat&amp; missing_mask,] &lt;misc_training_alg_params&gt; ...)" title="bool CvStatModel::train(const Mat&amp; train_data, [int tflag,] ..., const Mat&amp; responses, ..., [const Mat&amp; var_idx,] ..., [const Mat&amp; sample_idx,] ... [const Mat&amp; var_type,] ..., [const Mat&amp; missing_mask,] &lt;misc_training_alg_params&gt; ...)"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvStatModel::train()</span></tt></a>).
+Both <tt class="docutils literal"><span class="pre">tflag</span></tt> values (<tt class="docutils literal"><span class="pre">CV_ROW_SAMPLE</span></tt>, <tt class="docutils literal"><span class="pre">CV_COL_SAMPLE</span></tt>) are supported.
+<tt class="docutils literal"><span class="pre">trainData</span></tt> must be of the <tt class="docutils literal"><span class="pre">CV_32F</span></tt> type. <tt class="docutils literal"><span class="pre">responses</span></tt> must be a matrix of type
+<tt class="docutils literal"><span class="pre">CV_32S</span></tt> or <tt class="docutils literal"><span class="pre">CV_32F</span></tt>. In both cases it is converted into the <tt class="docutils literal"><span class="pre">CV_32F</span></tt>
+matrix inside the training procedure. <tt class="docutils literal"><span class="pre">varIdx</span></tt> and <tt class="docutils literal"><span class="pre">sampleIdx</span></tt> must be a
+list of indices (<tt class="docutils literal"><span class="pre">CV_32S</span></tt>) or a mask (<tt class="docutils literal"><span class="pre">CV_8U</span></tt> or <tt class="docutils literal"><span class="pre">CV_8S</span></tt>). <tt class="docutils literal"><span class="pre">update</span></tt> is
+a dummy parameter.</p>
+<p>The second form of <a class="reference internal" href="#bool CvGBTrees::train(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params, bool update)" title="bool CvGBTrees::train(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params, bool update)"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvGBTrees::train()</span></tt></a> function uses <a class="reference internal" href="mldata.html#CvMLData" title="class CvMLData"><tt class="xref ocv ocv-class docutils literal"><span class="pre">CvMLData</span></tt></a> as a
+data set container. <tt class="docutils literal"><span class="pre">update</span></tt> is still a dummy parameter.</p>
+<p>All parameters specific to the GBT model are passed into the training function
+as a <tt class="xref ocv ocv-class docutils literal"><span class="pre">CvGBTreesParams</span></tt> structure.</p>
+</div>
+<div class="section" id="cvgbtrees-predict">
+<h2>CvGBTrees::predict<a class="headerlink" href="#cvgbtrees-predict" title="Permalink to this headline">¶</a></h2>
+<p>Predicts a response for an input sample.</p>
+<dl class="function">
+<dt id="float CvGBTrees::predict(const Mat&amp; sample, const Mat&amp; missing, const Range&amp; slice , int k) const">
+<strong>C++:</strong><tt class="descname"> </tt>float <tt class="descclassname">CvGBTrees::</tt><tt class="descname">predict</tt><big>(</big>const Mat&amp; <strong>sample</strong>, const Mat&amp; <strong>missing</strong>=Mat(), const Range&amp; <strong>slice</strong>=Range::all(), int <strong>k</strong>=-1<big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#float CvGBTrees::predict(const Mat& sample, const Mat& missing, const Range& slice , int k) const" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="float CvGBTrees::predict(const CvMat* sample, const CvMat* missing, CvMat* weakResponses, CvSlice slice , int k) const">
+<strong>C++:</strong><tt class="descname"> </tt>float <tt class="descclassname">CvGBTrees::</tt><tt class="descname">predict</tt><big>(</big>const CvMat* <strong>sample</strong>, const CvMat* <strong>missing</strong>=0, CvMat* <strong>weakResponses</strong>=0, CvSlice <strong>slice</strong>=CV_WHOLE_SEQ, int <strong>k</strong>=-1 <big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#float CvGBTrees::predict(const CvMat* sample, const CvMat* missing, CvMat* weakResponses, CvSlice slice , int k) const" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="pyfunction">
+<dt id="cv2.GBTrees.predict">
+<strong>Python:</strong><tt class="descname"> </tt><tt class="descclassname">cv2.GBTrees.</tt><tt class="descname">predict</tt><big>(</big>sample<span class="optional">[</span>, missing<span class="optional">[</span>, slice<span class="optional">[</span>, k<span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big> &rarr; retval<a class="headerlink" href="#cv2.GBTrees.predict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>sample</strong> &#8211; Input feature vector that has the same format as every training set
+element. If not all the variables were actually used during training,
+<tt class="docutils literal"><span class="pre">sample</span></tt> contains forged values at the appropriate places.</li>
+<li><strong>missing</strong> &#8211; Missing values mask, which is a dimensional matrix of the same size as
+<tt class="docutils literal"><span class="pre">sample</span></tt> having the <tt class="docutils literal"><span class="pre">CV_8U</span></tt> type. <tt class="docutils literal"><span class="pre">1</span></tt> corresponds to the missing value
+in the same position in the <tt class="docutils literal"><span class="pre">sample</span></tt> vector. If there are no missing values
+in the feature vector, an empty matrix can be passed instead of the missing mask.</li>
+<li><strong>weakResponses</strong> &#8211; Matrix used to obtain predictions of all the trees.
+The matrix has <img class="math" src="../../../_images/math/dfb064112b6c94470339f6571f69d07afc1c024c.png" alt="K"/> rows,
+where <img class="math" src="../../../_images/math/dfb064112b6c94470339f6571f69d07afc1c024c.png" alt="K"/> is the count of output classes (1 for the regression case).
+The matrix has as many columns as the <tt class="docutils literal"><span class="pre">slice</span></tt> length.</li>
+<li><strong>slice</strong> &#8211; Parameter defining the part of the ensemble used for prediction.
+If <tt class="docutils literal"><span class="pre">slice</span> <span class="pre">=</span> <span class="pre">Range::all()</span></tt>, all trees are used. Use this parameter to
+get predictions of the GBT models with different ensemble sizes learning
+only one model.</li>
+<li><strong>k</strong> &#8211; Number of tree ensembles built in case of the classification problem
+(see <a class="reference internal" href="#training-gbt"><em>Training the GBT model</em></a>). Use this
+parameter to change the output to sum of the trees&#8217; predictions in the
+<tt class="docutils literal"><span class="pre">k</span></tt>-th ensemble only. To get the total GBT model prediction, <tt class="docutils literal"><span class="pre">k</span></tt> value
+must be -1. For regression problems, <tt class="docutils literal"><span class="pre">k</span></tt> is also equal to -1.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>The method predicts the response corresponding to the given sample
+(see <a class="reference internal" href="#predicting-with-gbt"><em>Predicting with the GBT Model</em></a>).
+The result is either the class label or the estimated function value. The
+<a class="reference internal" href="#float CvGBTrees::predict(const Mat&amp; sample, const Mat&amp; missing, const Range&amp; slice , int k) const" title="float CvGBTrees::predict(const Mat&amp; sample, const Mat&amp; missing, const Range&amp; slice , int k) const"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvGBTrees::predict()</span></tt></a> method enables using the parallel version of the GBT model
+prediction if the OpenCV is built with the TBB library. In this case, predictions
+of single trees are computed in a parallel fashion.</p>
+</div>
+<div class="section" id="cvgbtrees-clear">
+<h2>CvGBTrees::clear<a class="headerlink" href="#cvgbtrees-clear" title="Permalink to this headline">¶</a></h2>
+<p>Clears the model.</p>
+<dl class="function">
+<dt id="void CvGBTrees::clear()">
+<strong>C++:</strong><tt class="descname"> </tt>void <tt class="descclassname">CvGBTrees::</tt><tt class="descname">clear</tt><big>(</big><big>)</big><a class="headerlink" href="#void CvGBTrees::clear()" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="pyfunction">
+<dt id="cv2.GBTrees.clear">
+<strong>Python:</strong><tt class="descname"> </tt><tt class="descclassname">cv2.GBTrees.</tt><tt class="descname">clear</tt><big>(</big><big>)</big> &rarr; None<a class="headerlink" href="#cv2.GBTrees.clear" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p>The function deletes the data set information and all the weak models and sets all internal
+variables to the initial state. The function is called in <a class="reference internal" href="#bool CvGBTrees::train(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params, bool update)" title="bool CvGBTrees::train(const Mat&amp; trainData, int tflag, const Mat&amp; responses, const Mat&amp; varIdx, const Mat&amp; sampleIdx, const Mat&amp; varType, const Mat&amp; missingDataMask, CvGBTreesParams params, bool update)"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvGBTrees::train()</span></tt></a> and in the
+destructor.</p>
+</div>
+<div class="section" id="cvgbtrees-calc-error">
+<h2>CvGBTrees::calc_error<a class="headerlink" href="#cvgbtrees-calc-error" title="Permalink to this headline">¶</a></h2>
+<p>Calculates a training or testing error.</p>
+<dl class="function">
+<dt id="float CvGBTrees::calc_error(CvMLData* _data, int type, std::vector&lt;float&gt; *resp)">
+<strong>C++:</strong><tt class="descname"> </tt>float <tt class="descclassname">CvGBTrees::</tt><tt class="descname">calc_error</tt><big>(</big>CvMLData* <strong>_data</strong>, int <strong>type</strong>, std::vector&lt;float&gt;* <strong>resp</strong>=0 <big>)</big><a class="headerlink" href="#float CvGBTrees::calc_error(CvMLData* _data, int type, std::vector<float> *resp)" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>_data</strong> &#8211; Data set.</li>
+<li><strong>type</strong> &#8211; Parameter defining the error that should be computed: train (<tt class="docutils literal"><span class="pre">CV_TRAIN_ERROR</span></tt>) or test
+(<tt class="docutils literal"><span class="pre">CV_TEST_ERROR</span></tt>).</li>
+<li><strong>resp</strong> &#8211; If non-zero, a vector of predictions on the corresponding data set is
+returned.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>If the <a class="reference internal" href="mldata.html#CvMLData" title="class CvMLData"><tt class="xref ocv ocv-class docutils literal"><span class="pre">CvMLData</span></tt></a> data is used to store the data set, <a class="reference internal" href="#float CvGBTrees::calc_error(CvMLData* _data, int type, std::vector&lt;float&gt; *resp)" title="float CvGBTrees::calc_error(CvMLData* _data, int type, std::vector&lt;float&gt; *resp)"><tt class="xref ocv ocv-func docutils literal"><span class="pre">CvGBTrees::calc_error()</span></tt></a> can be
+used to get a training/testing error easily and (optionally) all predictions
+on the training/testing set. If the Intel* TBB* library is used, the error is computed in a
+parallel way, namely, predictions for different samples are computed at the same time.
+In case of a regression problem, a mean squared error is returned. For
+classifications, the result is a misclassification error in percent.</p>
+</div>
+</div>
+
+
+          </div>
+          <div class="feedback">
+              <h2>Help and Feedback</h2>
+              You did not find what you were looking for?
+              <ul>
+                  
+                  
+                  
+                  <li>Ask a question on the <a href="http://answers.opencv.org">Q&A forum</a>.</li>
+                  <li>If you think something is missing or wrong in the documentation,
+                  please file a <a href="http://code.opencv.org">bug report</a>.</li>
+              </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/opencv-logo-white.png" alt="Logo"/>
+            </a></p>
+<div id="searchbox" style="display: none">
+      <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Search" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+      </p>
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+  <h3><a href="../../../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Gradient Boosted Trees</a><ul>
+<li><a class="reference internal" href="#training-the-gbt-model">Training the GBT model</a></li>
+<li><a class="reference internal" href="#predicting-with-the-gbt-model">Predicting with the GBT Model</a></li>
+<li><a class="reference internal" href="#cvgbtreesparams">CvGBTreesParams</a></li>
+<li><a class="reference internal" href="#cvgbtreesparams-cvgbtreesparams">CvGBTreesParams::CvGBTreesParams</a></li>
+<li><a class="reference internal" href="#cvgbtrees">CvGBTrees</a></li>
+<li><a class="reference internal" href="#cvgbtrees-cvgbtrees">CvGBTrees::CvGBTrees</a></li>
+<li><a class="reference internal" href="#cvgbtrees-train">CvGBTrees::train</a></li>
+<li><a class="reference internal" href="#cvgbtrees-predict">CvGBTrees::predict</a></li>
+<li><a class="reference internal" href="#cvgbtrees-clear">CvGBTrees::clear</a></li>
+<li><a class="reference internal" href="#cvgbtrees-calc-error">CvGBTrees::calc_error</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="boosting.html"
+                        title="previous chapter">Boosting</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="random_trees.html"
+                        title="next chapter">Random Trees</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../../_sources/modules/ml/doc/gradient_boosted_trees.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="random_trees.html" title="Random Trees"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="boosting.html" title="Boosting"
+             >previous</a> |</li>
+        <li><a href="../../../index.html">OpenCV 2.4.9.0 documentation</a> &raquo;</li>
+          <li><a href="../../refman.html" >OpenCV API Reference</a> &raquo;</li>
+          <li><a href="ml.html" >ml. Machine Learning</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011-2014, opencv dev team.
+      Last updated on Apr 21, 2014.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

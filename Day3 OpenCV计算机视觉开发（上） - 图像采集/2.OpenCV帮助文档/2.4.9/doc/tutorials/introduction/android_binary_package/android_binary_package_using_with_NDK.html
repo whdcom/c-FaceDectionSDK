@@ -1,0 +1,471 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Using C++ OpenCV code with Android binary package &mdash; OpenCV v2.4.0 documentation</title>
+    <link rel="stylesheet" href="../../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '2.4.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../../../../../_static/insertIframe.js"></script>
+    <link rel="top" title="OpenCV v2.4.0 documentation" href="../../../../index.html" />
+    <link rel="up" title="Introduction to OpenCV" href="../table_of_content_introduction/table_of_content_introduction.html" />
+    <link rel="next" title="Installation in iOS" href="../ios_install/ios_install.html" />
+    <link rel="prev" title="Using Android binary package with Eclipse" href="android_binary_package.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../ios_install/ios_install.html" title="Installation in iOS"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="android_binary_package.html" title="Using Android binary package with Eclipse"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../../../index.html">OpenCV v2.4.0 documentation</a> &raquo;</li>
+          <li><a href="../../tutorials.html" >OpenCV Tutorials</a> &raquo;</li>
+          <li><a href="../table_of_content_introduction/table_of_content_introduction.html" accesskey="U">Introduction to OpenCV</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+  
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="using-c-opencv-code-with-android-binary-package">
+<span id="android-binary-package-with-ndk"></span><h1>Using C++ OpenCV code with Android binary package<a class="headerlink" href="#using-c-opencv-code-with-android-binary-package" title="Permalink to this headline">¶</a></h1>
+<p>The Android way is writing all your code in Java. But somethimes it is not enough and you need to go to a native level and write part of your application in C/C++.
+This is important when you already have some computer vision functionality which is written in C++ and uses OpenCV, and you want to use it in your Android application,
+but do not want to rewrite the C++ code to Java.
+In this case the only way is to use JNI mechanism.
+It means, that you should add a class with native methods wrapping your C++ functionality into the Java part of your Android application.</p>
+<p>This tutorial describes a fast way how to create and build Android applications containing OpenCV code written in C++. It shows how to build an application which uses OpenCV inside its JNI calls.</p>
+<p>Please note that before starting this tutorial you should fulfill all the steps, described in the tutorial <a class="reference internal" href="android_binary_package.html#android-binary-package"><em>Using Android binary package with Eclipse</em></a>.</p>
+<p>This tutorial was tested using Ubuntu 10.04 and Windows 7 SP1 operating systems.
+Nevertheless, it should also work on Mac OS X. If you encounter errors after following the steps described here, feel free to contact us via <em>android-opencv</em> discussion group <a class="reference external" href="https://groups.google.com/group/android-opencv/">https://groups.google.com/group/android-opencv/</a> and we will try to help you.</p>
+<div class="section" id="prerequisites-setup-ndk">
+<h2>Prerequisites: Setup NDK<a class="headerlink" href="#prerequisites-setup-ndk" title="Permalink to this headline">¶</a></h2>
+<p>To compile C++ code for Android platform you need Android <strong>N</strong>ative <strong>D</strong>evelopment <strong>K</strong>it (<em>NDK</em>).</p>
+<p>You can get the latest version of NDK from the page <a class="reference external" href="http://developer.android.com/sdk/ndk/index.html">http://developer.android.com/sdk/ndk/index.html</a> .</p>
+<p>To install Android NDK just extract the archive to some folder on your computer. (Here is installation instructions on the NDK home page: <a class="reference external" href="http://developer.android.com/sdk/ndk/index.html#installing">http://developer.android.com/sdk/ndk/index.html#installing</a>)</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Before start you can read official Android NDK documentation which is in the Android NDK archive, in the folder <tt class="file docutils literal"><span class="pre">docs/</span></tt>.</p>
+<p>The main article about using Android NDK build system you can read in the file <tt class="file docutils literal"><span class="pre">ANDROID-MK.html</span></tt>.</p>
+<p class="last">Also some additional useful information you can read in the files
+<tt class="file docutils literal"><span class="pre">APPLICATION-MK.html</span></tt>, <tt class="file docutils literal"><span class="pre">NDK-BUILD.html</span></tt>, and in the files <tt class="file docutils literal"><span class="pre">CPU-ARM-NEON.html</span></tt>, <tt class="file docutils literal"><span class="pre">CPLUSPLUS-SUPPORT.html</span></tt>,  <tt class="file docutils literal"><span class="pre">PREBUILTS.html</span></tt>.</p>
+</div>
+</div>
+<div class="section" id="theory-android-application-structure">
+<h2>Theory: Android application structure<a class="headerlink" href="#theory-android-application-structure" title="Permalink to this headline">¶</a></h2>
+<p>Usually code of an Android application has the following structure:</p>
+<ul class="simple">
+<li><tt class="file docutils literal"><span class="pre">root</span> <span class="pre">folder</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">project/</span></tt><ul>
+<li><tt class="file docutils literal"><span class="pre">jni/</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">libs/</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">res/</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">src/</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">AndroidManifest.xml</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">default.properties</span></tt></li>
+<li><tt class="file docutils literal"><span class="pre">...</span> <span class="pre">other</span> <span class="pre">files</span> <span class="pre">...</span></tt></li>
+</ul>
+</li>
+</ul>
+<p>where</p>
+<ul>
+<li><p class="first">the <tt class="file docutils literal"><span class="pre">src</span></tt> folder contains Java code of the application,</p>
+</li>
+<li><p class="first">the <tt class="file docutils literal"><span class="pre">res</span></tt> folder contains resources of the application (images, xml files describing UI layout , etc),</p>
+</li>
+<li><p class="first">the <tt class="file docutils literal"><span class="pre">libs</span></tt> folder will contain native libraries after successful build,</p>
+</li>
+<li><p class="first">and the <tt class="file docutils literal"><span class="pre">jni</span></tt> folder contains C/C++ application source code and NDK&#8217;s build scripts <tt class="file docutils literal"><span class="pre">Android.mk</span></tt> and <tt class="file docutils literal"><span class="pre">Application.mk</span></tt>.</p>
+<p>These scripts control the C++ build process (they are written in Makefile language).</p>
+</li>
+</ul>
+<p>Also the root folder should contain the following files</p>
+<ul>
+<li><p class="first"><tt class="file docutils literal"><span class="pre">AndroidManifest.xml</span></tt> file presents essential information about application to the Android system
+(name of the Application, name of main application&#8217;s package, components of the application, required permissions, etc)</p>
+<p>It can be created using Eclipse wizard or <strong class="command">android</strong> tool from Android SDK</p>
+</li>
+<li><p class="first"><tt class="file docutils literal"><span class="pre">default.properties</span></tt> is a text file containing information about target Android platform and other build details.</p>
+<p>This file is generated by Eclipse or can be created with <strong class="command">android</strong> tool from Android SDK</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Both files (<tt class="file docutils literal"><span class="pre">AndroidManifest.xml</span></tt> and <tt class="file docutils literal"><span class="pre">default.properties</span></tt>) are required to compile the C++ part of the application (NDK build system uses information from these files). If any of these files does not exist, compile the Java part of the project before the C++ part.</p>
+</div>
+</div>
+<div class="section" id="theory-how-to-build-android-application-having-c-native-part-from-command-line">
+<h2>Theory: How to build Android application having C++ native part (from command line)<a class="headerlink" href="#theory-how-to-build-android-application-having-c-native-part-from-command-line" title="Permalink to this headline">¶</a></h2>
+<p>Here is the standard way to compile C++ part of an Android application:</p>
+<ol class="arabic">
+<li><p class="first">Open console and go to the root folder of Android application</p>
+<div class="highlight-bash"><div class="highlight"><pre><span class="nb">cd</span> &lt;root folder of the project&gt;/
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Alternatively you can go to the folder <tt class="file docutils literal"><span class="pre">jni</span></tt> of Android project but samples from OpenCV binary package are configured for building from project root level (because of relative path to the OpenCV library).</p>
+</div>
+</li>
+<li><p class="first">Run the following command</p>
+<div class="highlight-bash"><div class="highlight"><pre>&lt;path_where_NDK_is_placed&gt;/ndk-build
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>If you are working in <em>cygwin</em> shell and encounter an error saying that NDK does not find some <em>cygwin</em>&#8216;s path then you might need to define the following environment variable:</p>
+<div class="last highlight-bash"><div class="highlight"><pre><span class="nb">export </span><span class="nv">NDK_USE_CYGPATH</span><span class="o">=</span>1
+</pre></div>
+</div>
+</div>
+</li>
+<li><p class="first">After executing this command the C++ part of the source code is compiled.</p>
+</li>
+</ol>
+<p>After that the Java part of the application can be (re)compiled (using either <em>Eclipse</em> or <strong class="command">ant</strong> build tool).</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Some parameters can be set for the <strong class="command">ndk-build</strong>:</p>
+<p><strong>Example 1</strong>: Verbose compilation</p>
+<div class="highlight-bash"><div class="highlight"><pre>&lt;path_where_NDK_is_placed&gt;/ndk-build <span class="nv">V</span><span class="o">=</span>1
+</pre></div>
+</div>
+<p><strong>Example 2</strong>: Rebuild all</p>
+<div class="last highlight-bash"><div class="highlight"><pre>&lt;path_where_NDK_is_placed&gt;/ndk-build -B
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="theory-how-to-build-android-application-having-c-native-part-from-eclipse">
+<span id="android-ndk-integration-with-eclipse"></span><h2>Theory: How to build Android application having C++ native part (from <em>Eclipse</em>)<a class="headerlink" href="#theory-how-to-build-android-application-having-c-native-part-from-eclipse" title="Permalink to this headline">¶</a></h2>
+<p>There are several possible ways to integrate compilation of C++ code by Android NDK into Eclipse compilation process. We recommend the approach taken from this site: <a class="reference external" href="http://mobilepearls.com/labs/ndk-builder-in-eclipse/">http://mobilepearls.com/labs/ndk-builder-in-eclipse/</a></p>
+<div class="admonition important">
+<p class="first admonition-title">Important</p>
+<p class="last">This instructions should be applied for each Android project in <em>Eclipse</em> workspace. So if you have 3 projects having C++ part then you need to configure 3 builders.</p>
+</div>
+<p>Below is an adapted version of this guide:</p>
+<ol class="arabic">
+<li><p class="first">Navigate to <em class="guilabel">Package Explorer</em> window and expand your project having JNI resources.</p>
+<p>If you can not see <tt class="file docutils literal"><span class="pre">libs</span></tt> folder under this project then you need to create it manually. (It will be required on step 7, but you need to create it before you open project properties.)</p>
+</li>
+<li><p class="first">Right click on your project in <em class="guilabel">Package Explorer</em> window and select <em class="guilabel">Properties</em>.</p>
+</li>
+<li><p class="first">In the <em class="guilabel">Properties</em> dialog select <em class="guilabel">Builders</em> menu and press the <em class="guilabel">New...</em> button:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Configure builders" class="align-center" src="../../../../_images/eclipse_builders.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">In the resulting dialog select the <em class="guilabel">Program</em> type and press <em class="guilabel">OK</em> button:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Choose builder type" class="align-center" src="../../../../_images/eclipse_builder_types.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">In the <em class="guilabel">Main</em> tab fill the following fields:</p>
+<blockquote>
+<div><ul>
+<li><p class="first"><em class="guilabel">Name</em> - any name for your builder. (&#8220;Tutorial 2.1 Builder&#8221; in my case.)</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This name has to be unique for each project in your workspace.</p>
+</div>
+</li>
+<li><p class="first"><em class="guilabel">Location</em> - full path to <strong class="command">ndk-build</strong> tool.</p>
+<ul>
+<li><p class="first"><em>UNIX</em></p>
+<p>Just put full path to <strong class="command">ndk-build</strong> into this filed. Also you can add some options to the <em class="guilabel">Arguments:guilabel:</em> fied, for example <tt class="docutils literal"><span class="pre">-B</span></tt> option.</p>
+</li>
+<li><p class="first"><em>Cygwin</em></p>
+<ul>
+<li><p class="first">Instead of path to the <strong class="command">ndk-build</strong> tool you need to put full path to <em>cygwin</em>&#8216;s <strong class="program">bash.exe</strong> location. E.g: <tt class="file docutils literal"><span class="pre">C:\cygwin\bin\bash.exe</span></tt>.</p>
+</li>
+<li><p class="first">Put full path to <strong class="command">ndk-build</strong> into the <em class="guilabel">Arguments</em> field E.g. <tt class="file docutils literal"><span class="pre">C:\Android\android-ndk-r6\ndk-build</span></tt>.</p>
+</li>
+<li><p class="first">Go to the <em class="guilabel">Environment</em> tab and define an environment variable:</p>
+<blockquote>
+<div><ul class="simple">
+<li><span class="target" id="index-0"></span><tt class="xref std std-envvar docutils literal"><span class="pre">PATH</span></tt> - full path to the <em>cygwin</em> tools. E.g. <tt class="file docutils literal"><span class="pre">C:\cygwin\bin</span></tt></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Define environment variables" class="align-center" src="../../../../_images/eclipse_windows_environment.png" /></div>
+</div></blockquote>
+<ul class="simple">
+<li><em class="guilabel">Working Directory</em> - put path to your project into this field. Instead of hardcoding full path you can click <em class="guilabel">Browse Workspace...</em> button and select your project.</li>
+</ul>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Define environment variables" class="align-center" src="../../../../_images/eclipse_edit_configuration_main.png" /></div>
+</div></blockquote>
+</div></blockquote>
+</li>
+<li><p class="first">Go to the <em class="guilabel">Refresh</em> tab and select both <em class="guilabel">Refresh resources upon completion</em> and <em class="guilabel">Recursively include sub-folders</em>.</p>
+<p>Next set the <em class="guilabel">Specific resources</em> option and click <em class="guilabel">Specify resources...</em> button:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Define environment variables" class="align-center" src="../../../../_images/eclipse_edit_configuration_refresh.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">Select <tt class="file docutils literal"><span class="pre">libs</span></tt> folder under your project and click <em class="guilabel">Finish</em>:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Select resources folder to refresh automatically" class="align-center" src="../../../../_images/eclipse_edit_configuration_specify_resources.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">Go to the last tab <em class="guilabel">Build options</em>. Make sure that all checkboxes are set as shown on the next screen:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Configure build options" class="align-center" src="../../../../_images/eclipse_edit_configuration_build_options.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">Next, click the <em class="guilabel">Specify resources...</em> button.</p>
+</li>
+<li><p class="first">Select <tt class="file docutils literal"><span class="pre">jni</span></tt> folder of your project and click the <em class="guilabel">Finish</em> button:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Select resources to build" class="align-center" src="../../../../_images/eclipse_edit_configuration_build_resources.png" /></div>
+</div></blockquote>
+</li>
+<li><p class="first">Finally press <em class="guilabel">OK</em> in the builder configuration and project properties dialogs. If you have automatic build turned on then console showing build log should appear:</p>
+<blockquote>
+<div><div align="center" class="align-center"><img alt="Select resources to build" class="align-center" src="../../../../_images/eclipse_NDK_build_success.png" /></div>
+</div></blockquote>
+</li>
+</ol>
+</div>
+<div class="section" id="theory-the-structure-of-android-mk-and-application-mk-scripts">
+<h2>Theory: The structure of <tt class="file docutils literal"><span class="pre">Android.mk</span></tt> and <tt class="file docutils literal"><span class="pre">Application.mk</span></tt> scripts<a class="headerlink" href="#theory-the-structure-of-android-mk-and-application-mk-scripts" title="Permalink to this headline">¶</a></h2>
+<p>The script <tt class="file docutils literal"><span class="pre">Android.mk</span></tt> usually have the following structure:</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="nv">LOCAL_PATH</span> <span class="o">:=</span> <span class="k">$(</span>call my-dir<span class="k">)</span>
+
+<span class="cp">include $(CLEAR_VARS)</span>
+LOCAL_MODULE    :<span class="o">=</span> &lt;module_name&gt;
+LOCAL_SRC_FILES :<span class="o">=</span> &lt;list of .c and .cpp project files&gt;
+&lt;some variable name&gt; :<span class="o">=</span> &lt;some variable value&gt;
+...
+&lt;some variable name&gt; :<span class="o">=</span> &lt;some variable value&gt;
+
+<span class="cp">include $(BUILD_SHARED_LIBRARY)</span>
+</pre></div>
+</div>
+<p>This is the minimal file <tt class="file docutils literal"><span class="pre">Android.mk</span></tt>, which builds a C++ source code of an Android application. Note that the first two lines and the last line are mandatory for any <tt class="file docutils literal"><span class="pre">Android.mk</span></tt>.</p>
+<p>Usually the file <tt class="file docutils literal"><span class="pre">Application.mk</span></tt> is optional, but in case of project using OpenCV, when STL and exceptions are used in C++, it also should be written. Example of the file <tt class="file docutils literal"><span class="pre">Application.mk</span></tt>:</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="nv">APP_STL</span> <span class="o">:=</span> gnustl_static
+APP_CPPFLAGS :<span class="o">=</span> -frtti -fexceptions
+APP_ABI :<span class="o">=</span> armeabi-v7a
+</pre></div>
+</div>
+</div>
+<div class="section" id="practice-build-samples-from-opencv-binary-package">
+<h2>Practice: Build samples from OpenCV binary package<a class="headerlink" href="#practice-build-samples-from-opencv-binary-package" title="Permalink to this headline">¶</a></h2>
+<p>OpenCV binary package includes two samples having JNI resources:</p>
+<ul>
+<li><p class="first"><em>Tutorial 2 Advanced - 1. Add Native OpenCV</em></p>
+<p>This sample illustrate how you can use OpenCV in C++ but without OpenCV Java API.</p>
+</li>
+<li><p class="first"><em>Tutorial 2 Advanced - 2. Mix Java+Native OpenCV</em></p>
+<p>This sample shows how you can mix OpenCV Java API and native C++ code.</p>
+</li>
+</ul>
+<p>To build these samples you need to:</p>
+<ol class="arabic simple">
+<li>Fulfill all the steps, described in the tutorial <a class="reference internal" href="android_binary_package.html#android-binary-package"><em>Using Android binary package with Eclipse</em></a>.</li>
+<li>Setup one builder for <em>&#8220;Tutorial 2 Advanced - 1. Add Native OpenCV&#8221;</em> project (as described in <a class="reference internal" href="#android-ndk-integration-with-eclipse"><em>Theory: How to build Android application having C++ native part (from Eclipse)</em></a>)</li>
+<li>Setup second builder for <em>&#8220;Tutorial 2 Advanced - 2. Mix Java+Native OpenCV&#8221;</em> project (repeat the steps from <a class="reference internal" href="#android-ndk-integration-with-eclipse"><em>Theory: How to build Android application having C++ native part (from Eclipse)</em></a>)</li>
+<li>Clean these projects (in the main Eclipse menu: <em class="menuselection">Project ‣ Clean...</em>)</li>
+<li>Run Eclipse build command (if option <em class="guilabel">Build Automatically</em> is not set)</li>
+</ol>
+</div>
+<div class="section" id="practice-create-an-android-application-which-uses-opencv">
+<h2>Practice: Create an Android application, which uses OpenCV<a class="headerlink" href="#practice-create-an-android-application-which-uses-opencv" title="Permalink to this headline">¶</a></h2>
+<p>To build your own Android application, which uses OpenCV from native part, the following steps should be done:</p>
+<ol class="arabic">
+<li><p class="first">The archive with OpenCV binary package should be downloaded and extracted to some folder (as example, into the home folder)</p>
+</li>
+<li><p class="first">We recommend to use an environment variable to specify the location of OpenCV package. Full or relative path hardcoded in <tt class="file docutils literal"><span class="pre">jni/Android.mk</span></tt> will also work.</p>
+<p>So, the environment variable <span class="target" id="index-1"></span><tt class="xref std std-envvar docutils literal"><span class="pre">OPENCV_PACKAGE_DIR</span></tt> should be defined.
+The value of the variable should points to the folder, where the OpenCV package has been extracted.</p>
+<p>As an example, on <em>UNIX</em> you can add add the following line into the hidden file <tt class="file docutils literal"><span class="pre">.bashrc</span></tt> placed in your home folder:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span class="nb">export </span><span class="nv">OPENCV_PACKAGE_DIR</span> <span class="o">=</span> &lt;path to the extracted OpenCV package&gt;
+</pre></div>
+</div>
+<p>Then relogin (or better reboot your computer).</p>
+<div class="admonition attention">
+<p class="first admonition-title">Attention</p>
+<p class="last">without rebooting (or logout) this change might not work.</p>
+</div>
+<p>If you are a <em>Windows</em> user, then navigate to:</p>
+<ul>
+<li><p class="first"><em>Windows 7 / Windows Vista</em></p>
+<p><em class="menuselection">My Computer (Right Click on Icon) ‣ Properties (Link) ‣ Advanced System Settings (Link) ‣ Advanced (Tab) ‣ Environment Variables (Button) ‣ System variables (Section)</em></p>
+</li>
+<li><p class="first"><em>Windows XP</em></p>
+<p><em class="menuselection">My Computer (Right Click on Icon) ‣ Properties (Link) ‣ Advanced (Tab) ‣ Environment Variables (Button) ‣ System variables (Section)</em></p>
+</li>
+</ul>
+<p>Create new variable <span class="target" id="index-2"></span><tt class="xref std std-envvar docutils literal"><span class="pre">OPENCV_PACKAGE_DIR</span></tt> and similarly to <em>UNIX</em> relogin or reboot.</p>
+<p>If you are setting NDK builder as described above in <a class="reference internal" href="#android-ndk-integration-with-eclipse"><em>Theory: How to build Android application having C++ native part (from Eclipse)</em></a>, then you can define this variable in builder settings. It can be done on third <em class="guilabel">Environment</em> tab of the builder configuration window (we have already added some variables to this tab on <em>Windows</em> but skipped it for other platforms).</p>
+</li>
+<li><p class="first">The file <tt class="file docutils literal"><span class="pre">jni/Android.mk</span></tt> should be written for the current application using the common rules for the file.</p>
+<p>For detailed information see the Android NDK documentation from the Android NDK archive, in the file
+<tt class="file docutils literal"><span class="pre">&lt;path_where_NDK_is_placed&gt;/docs/ANDROID-MK.html</span></tt></p>
+</li>
+<li><p class="first">The line</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="cp">include $(OPENCV_PACKAGE_DIR)/share/OpenCV/OpenCV.mk</span>
+</pre></div>
+</div>
+<p>should be inserted into the <tt class="file docutils literal"><span class="pre">jni/Android.mk</span></tt> file right after the line</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="cp">include $(CLEAR_VARS)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>If your application utilize both native (C++) OpenCV and its Java API you need to put the following line before including <tt class="file docutils literal"><span class="pre">OpenCV.mk</span></tt> to avoid conflict between C++ and Java builders:</p>
+<div class="last highlight-make"><div class="highlight"><pre><span class="nv">OPENCV_CAMERA_MODULES</span><span class="o">:=</span>off
+</pre></div>
+</div>
+</div>
+</li>
+<li><p class="first">The file <tt class="file docutils literal"><span class="pre">Application.mk</span></tt> should exist and should contain lines</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="nv">APP_STL</span> <span class="o">:=</span> gnustl_static
+APP_CPPFLAGS :<span class="o">=</span> -frtti -fexceptions
+</pre></div>
+</div>
+<p>Also the line</p>
+<div class="highlight-make"><div class="highlight"><pre><span class="nv">APP_ABI</span> <span class="o">:=</span> armeabi-v7a
+</pre></div>
+</div>
+<p>is recommended for the applications targeting modern ARMs</p>
+</li>
+<li><p class="first">To build the C++ code the Android NDK script <strong class="command">ndk-build</strong> should be run in the root directory of application.
+Then the C++ source code using OpenCV will be built by Android NDK build system.
+After that the Java part of the application can be rebuild and the application can be installed on an Android device.</p>
+<p>Note that this step requires calling the <strong class="command">ndk-build</strong> script from the console. Instead of this step you can use integration of Android NDK into Eclipse
+as stated above in  the section <a class="reference internal" href="#android-ndk-integration-with-eclipse"><em>Theory: How to build Android application having C++ native part (from Eclipse)</em></a> .</p>
+</li>
+</ol>
+</div>
+<div class="section" id="additional-c-support-in-eclipse">
+<h2>Additional C++ support in Eclipse<a class="headerlink" href="#additional-c-support-in-eclipse" title="Permalink to this headline">¶</a></h2>
+<p>Note that you can install additional C++ plugins in Eclipse:</p>
+<ol class="arabic simple">
+<li>Open <em class="guilabel">Help / Install New Software</em>. This shows the <em class="guilabel">Install</em> dialog.</li>
+<li>In the <em class="guilabel">Work with</em> drop-down list choose <em class="guilabel">Helios - http://download.eclipse.org/releases/helios</em> (or <em class="guilabel">Indigo - http://download.eclipse.org/releases/indigo</em> depending on your Eclipse version) and wait while the list of available software is loaded.</li>
+<li>From the list of available software select <em class="menuselection">Programming Languages ‣ C/C++ Development Tools</em>.</li>
+<li>Click <em class="guilabel">Next</em>, click <em class="guilabel">Next</em> again, accept the agreement, and click the <em class="guilabel">Finish</em> button.</li>
+<li>When installation is finished, click <em class="guilabel">Reload</em></li>
+</ol>
+</div>
+</div>
+
+
+          </div>
+          <div class="feedback">
+              <h2>Help and Feedback</h2>
+              You did not find what you were looking for?
+              <ul>
+                  
+                  
+                  
+                  <li>Ask a question in the <a href="http://tech.groups.yahoo.com/group/OpenCV/">user group/mailing list</a>.</li>
+                  <li>If you think something is missing or wrong in the documentation,
+                  please file a <a href="http://code.opencv.org">bug report</a>.</li>
+              </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../../index.html">
+              <img class="logo" src="../../../../_static/opencv-logo-white.png" alt="Logo"/>
+            </a></p>
+<div id="searchbox" style="display: none">
+      <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Search" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+      </p>
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+  <h3><a href="../../../../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Using C++ OpenCV code with Android binary package</a><ul>
+<li><a class="reference internal" href="#prerequisites-setup-ndk">Prerequisites: Setup NDK</a></li>
+<li><a class="reference internal" href="#theory-android-application-structure">Theory: Android application structure</a></li>
+<li><a class="reference internal" href="#theory-how-to-build-android-application-having-c-native-part-from-command-line">Theory: How to build Android application having C++ native part (from command line)</a></li>
+<li><a class="reference internal" href="#theory-how-to-build-android-application-having-c-native-part-from-eclipse">Theory: How to build Android application having C++ native part (from <em>Eclipse</em>)</a></li>
+<li><a class="reference internal" href="#theory-the-structure-of-android-mk-and-application-mk-scripts">Theory: The structure of <tt class="file docutils literal"><span class="pre">Android.mk</span></tt> and <tt class="file docutils literal"><span class="pre">Application.mk</span></tt> scripts</a></li>
+<li><a class="reference internal" href="#practice-build-samples-from-opencv-binary-package">Practice: Build samples from OpenCV binary package</a></li>
+<li><a class="reference internal" href="#practice-create-an-android-application-which-uses-opencv">Practice: Create an Android application, which uses OpenCV</a></li>
+<li><a class="reference internal" href="#additional-c-support-in-eclipse">Additional C++ support in Eclipse</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="android_binary_package.html"
+                        title="previous chapter">Using Android binary package with Eclipse</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../ios_install/ios_install.html"
+                        title="next chapter">Installation in iOS</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../../../_sources/doc/tutorials/introduction/android_binary_package/android_binary_package_using_with_NDK.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../ios_install/ios_install.html" title="Installation in iOS"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="android_binary_package.html" title="Using Android binary package with Eclipse"
+             >previous</a> |</li>
+        <li><a href="../../../../index.html">OpenCV v2.4.0 documentation</a> &raquo;</li>
+          <li><a href="../../tutorials.html" >OpenCV Tutorials</a> &raquo;</li>
+          <li><a href="../table_of_content_introduction/table_of_content_introduction.html" >Introduction to OpenCV</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011-2012, opencv dev team.
+      Last updated on Apr 28, 2012.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
